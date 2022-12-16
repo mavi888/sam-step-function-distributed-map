@@ -1,0 +1,91 @@
+{
+	"StartAt": "Check if item exists",
+	"States": {
+		"Check if item exists": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::dynamodb:getItem",
+			"Parameters": {
+				"TableName": "${MetadataTable}",
+				"Key": {
+					"id": {
+						"S.$": "$.StatePayload.Content"
+					}
+				}
+			},
+			"ResultPath": "$.result",
+			"Next": "Exists?"
+		},
+		"Exists?": {
+			"Type": "Choice",
+			"Choices": [
+				{
+					"Not": {
+						"Variable": "$.result.Item",
+						"IsPresent": true
+					},
+					"Next": "Add Item"
+				},
+				{
+					"Variable": "$.result.Item",
+					"IsPresent": true,
+					"Next": "Update Total Views"
+				}
+			]
+		},
+		"Add Item": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::dynamodb:putItem",
+			"Parameters": {
+				"TableName": "${MetadataTable}",
+				"Item": {
+					"id": {
+						"S.$": "$.StatePayload.Content"
+					},
+					"VideoPublishTime": {
+						"S.$": "$.StatePayload.VideoPublishTime"
+					},
+					"VideoTitle": {
+						"S.$": "$.StatePayload.VideoTitle"
+					},
+					"Views": {
+						"N.$": "$.StatePayload.Views"
+					}
+				}
+			},
+			"ResultPath": "$.result",
+			"Next": "Add Monthly Metrics"
+		},
+		"Update Total Views": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::lambda:invoke",
+			"Parameters": {
+				"Payload.$": "$",
+				"FunctionName": "${UpdateTotalViewsFunction}"
+			},
+			"ResultSelector": {
+				"StatePayload.$": "$.Payload"
+			},
+			"Next": "Add Monthly Metrics"
+		},
+		"Add Monthly Metrics": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::dynamodb:putItem",
+			"Parameters": {
+				"TableName": "${MetricsTable}",
+				"Item": {
+					"YYMM": {
+						"S.$": "States.Format('{}{}', States.ArrayGetItem(States.StringSplit(States.ArrayGetItem(States.StringSplit($$.State.EnteredTime, 'T'), 0), '-'), 0),States.ArrayGetItem(States.StringSplit(States.ArrayGetItem(States.StringSplit($$.State.EnteredTime, 'T'), 0), '-'), 1))"
+					},
+					"id": {
+						"S.$": "$.StatePayload.Content"
+					},
+					"views": {
+						"N.$": "$.StatePayload.Views"
+					}
+				}
+			},
+
+			"End": true
+		}
+	}
+}
