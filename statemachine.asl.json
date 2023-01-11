@@ -36,6 +36,13 @@
 					"Bucket": "${CSVBucket}",
 					"Key": "metrics.csv"
 				}
+			},
+			"ResultWriter": {
+				"Resource": "arn:aws:states:::s3:putObject",
+				"Parameters": {
+				  "Bucket": "output-folder-for-map-run-results",
+				  "Prefix": "110882384774-us-east-1-process-metrics-parent"
+				}
 			}
 		}
 	}
